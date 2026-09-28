@@ -2,15 +2,9 @@
 
 A hands-on learning repository for Git integration, bundles, and automated deployment.
 
-Prepared repository name: **`databricks-cicd-learning`**.
+**Start here:** [Follow-along lab: from Git integration to a running job](docs/follow-along-lab.md).
 
-**GitHub rename pending:** open [repository settings](https://github.com/pschehl/dbx_git_integration/settings), change **Repository name** to `databricks-cicd-learning`, and click **Rename**. The available Git credential lacks repository administration permission, so this step could not be completed automatically. After renaming, update this checkout:
-
-```bash
-git remote set-url origin https://github.com/pschehl/databricks-cicd-learning.git
-```
-
-The guides already use the new repository name. The local folder remains `dbx_git_integration`; its name does not need to match GitHub. Existing Databricks Git folders may retain their old folder name. GitHub redirects Git operations from the old repository URL; use the new URL for future clones. [GitHub rename reference](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository)
+Repository: `https://github.com/pschehl/dbx-cicd-learning.git`. The repository, bundle, and deployment paths use `dbx-cicd-learning`.
 
 The project has three stages:
 
@@ -43,15 +37,34 @@ python3 -m unittest discover -s tests -v
 python3 src/sales_job.py --environment dev --batch-size 10 --min-total-cents 2000
 ```
 
-Then follow [stage 2](docs/databricks-bundles.md) to authenticate, validate, deploy, and run your first bundle.
+For the complete exercise, follow the [lab](docs/follow-along-lab.md). For deployment details, follow [stage 2](docs/databricks-bundles.md) to authenticate, validate, deploy, and run your first bundle.
 
-| File | Purpose |
-| --- | --- |
-| `databricks.yml` | Targets, variables, deployment paths, and run identities |
-| `resources/sales_job.yml` | Serverless job and runtime parameters |
-| `src/sales_job.py` | Synthetic sales transformation and runtime quality checks |
-| `tests/test_sales_job.py` | Local tests of calculations, validation, and CLI behavior |
-| `.github/workflows/ci-cd.yml` | Tests and ordered environment promotion |
-| `.github/workflows/deploy.yml` | Reusable validate/deploy/run steps |
+Repository structure (project files; generated files and Git internals omitted):
 
-The job prints a JSON result to task logs and writes no tables. Each deployment records its source revision. Start with this small exercise before adding catalogs, schemas, persistent data, and migrations.
+```text
+dbx-cicd-learning/
+├── README.md                         Project overview and starting point
+├── .gitignore                        Excludes local state, caches, and environment files
+├── databricks.yml                    Bundle targets, variables, paths, and run identities
+├── .github/                          GitHub automation configuration
+│   └── workflows/                    GitHub Actions workflow definitions
+│       ├── ci-cd.yml                 Tests and ordered dev → staging → prod promotion
+│       └── deploy.yml                Reusable bundle validation, deployment, and execution
+├── docs/                             Setup references and practical exercises
+│   ├── follow-along-lab.md           Step-by-step exercise from local run to CI/CD
+│   ├── databricks-git-integration.md GitHub connection and working-copy synchronization
+│   ├── databricks-bundles.md         Bundle configuration, deployment, and cleanup
+│   └── cicd-workflow.md              CI authentication, promotion, failure, and recovery
+├── resources/                        Databricks resource definitions included by the bundle
+│   └── sales_job.yml                 Serverless job, task, and runtime parameter wiring
+├── src/                              Application code uploaded with the bundle
+│   └── sales_job.py                  Synthetic sales transformation and quality checks
+└── tests/                            Local and CI tests; excluded from bundle upload
+    └── test_sales_job.py             Calculation, input validation, and command-line tests
+```
+
+Local directories such as `.databricks/` (bundle state), `.venv/` (an optional Python environment), and `__pycache__/` (Python caches) may appear as you work. They are ignored by Git. `.git/` stores the checkout's version history and configuration.
+
+The job prints a JSON result to task logs and writes no tables. CI deployments record the triggering Git commit; interactive deployments use `local` by default. Start with this small exercise before adding catalogs, schemas, persistent data, and migrations.
+
+Configure CI authentication and GitHub environments before merging changes to `main`: the workflow attempts automatic promotion on every push to `main`. Start with a personal dev deployment in the lab.

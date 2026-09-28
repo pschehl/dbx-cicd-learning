@@ -9,7 +9,7 @@ Prepared: 2026-09-28. Documentation checked against official sources on that dat
 Your laptop already has a Git repository with this remote:
 
 ```text
-https://github.com/pschehl/databricks-cicd-learning.git
+https://github.com/pschehl/dbx-cicd-learning.git
 ```
 
 Databricks will have a second working copy, called a **Git folder**. Older tutorials call this **Repos**, and the Databricks CLI still uses `repos` commands. GitHub is the shared remote between the two copies. Git folders support editing notebooks/files and normal version-control operations. [Databricks concepts](https://docs.databricks.com/aws/en/repos/git-folders-concepts)
@@ -41,9 +41,9 @@ Keep this table current after verifying the integration. Never record passwords 
 | Item | Value / status |
 | --- | --- |
 | Git provider | GitHub |
-| Repository | `https://github.com/pschehl/databricks-cicd-learning.git` |
+| Repository | `https://github.com/pschehl/dbx-cicd-learning.git` |
 | GitHub owner | `pschehl` |
-| Local folder | `/Users/p.schehl/Documents/databricks/dbx_git_integration` |
+| Local folder | `/Users/p.schehl/Documents/databricks/dbx-cicd-learning` |
 | Local branch inspected | `main` |
 | Cloud provider | AWS (confirmed by user) |
 | Workspace URL | `https://dbc-97622683-114b.cloud.databricks.com` |
@@ -58,7 +58,7 @@ Keep this table current after verifying the integration. Never record passwords 
 | Laptop-to-workspace pull verified | Pending |
 | Last successful verification | Pending |
 
-At initial preparation, only `README.md` was tracked and `databricks` was not on the shell PATH. The user subsequently completed Git integration. The assistant has not independently run the synchronization checks.
+Git integration is complete as reported by the user. Record the synchronization checks above after observing them. For your next practical step, follow the [deployment lab](follow-along-lab.md).
 
 ## 3. Before starting
 
@@ -78,7 +78,7 @@ Logging into Databricks does not automatically give it your laptop's GitHub cred
 1. In Databricks, open your user menu → **Settings** → **Linked accounts**.
 2. Choose **Add Git credential**, provider **GitHub**, then **Link Git account**.
 3. Complete GitHub authorization with the intended account.
-4. Install/configure the **Databricks GitHub app** for owner `pschehl`. Choose **Only select repositories** and select `databricks-cicd-learning`.
+4. Install/configure the **Databricks GitHub app** for owner `pschehl`. Choose **Only select repositories** and select `dbx-cicd-learning`.
 5. Return to Databricks and confirm the Git credential appears.
 
 User authorization and app installation are separate steps; both matter. If the repository belongs to an organization, its owner may need to approve access. Databricks recommends this app for hosted GitHub. This is the app installed in GitHub, independent of any assistant plugin. [GitHub connection instructions](https://docs.databricks.com/aws/en/repos/get-access-tokens-from-git-provider)
@@ -93,9 +93,9 @@ In **Workspace**, navigate to your user folder, then select **Create → Git fol
 
 | Field | Value |
 | --- | --- |
-| Repository URL | `https://github.com/pschehl/databricks-cicd-learning.git` |
+| Repository URL | `https://github.com/pschehl/dbx-cicd-learning.git` |
 | Provider | `GitHub` |
-| Folder name | `databricks-cicd-learning` |
+| Folder name | `dbx-cicd-learning` |
 | Sparse checkout | Leave disabled for this small repository |
 
 Create it, open the Git dialog, and check the branch is `main`. Record the actual workspace path. Confirm `README.md` appears. The documentation written locally will appear only after it has been committed, pushed, and pulled.
@@ -122,14 +122,14 @@ Use a dedicated branch so the experiment is easy to review. The following comman
 5. On your laptop, run:
 
    ```bash
-   cd /Users/p.schehl/Documents/databricks/dbx_git_integration
+   cd /Users/p.schehl/Documents/databricks/dbx-cicd-learning
    git status
    git fetch origin
    git switch --track origin/learning/git-connection-check
    cat git-connection-check.txt
    ```
 
-Before switching branches, preserve any local work. In particular, commit the newly prepared guide on its intended branch or temporarily stash it with untracked files included (`git stash push -u`); restore that stash on the original branch afterward. Do not discard documentation to run the exercise. If the exercise branch already exists locally, use `git switch learning/git-connection-check` instead.
+Before switching branches, preserve any local work. Commit edits on their intended branch or temporarily stash them with untracked files included (`git stash push -u`); restore that stash on the original branch afterward. If the exercise branch already exists locally, use `git switch learning/git-connection-check` instead.
 
 ### B. Laptop → GitHub → Databricks
 
@@ -153,7 +153,7 @@ In Databricks, stay on the same exercise branch, open the Git dialog, and **Pull
 
 ### C. Complete the exercise
 
-Open a GitHub PR from `learning/git-connection-check` into `main`, review it, and merge when ready. Then switch both copies to `main` and pull. On the laptop, once your working tree is clean:
+Open a GitHub PR from `learning/git-connection-check` into `main`, review it, and merge after configuring [CI authentication and environments](cicd-workflow.md). Every push to `main` starts the deployment workflow, including documentation changes. Then switch both copies to `main` and pull. On the laptop, once your working tree is clean:
 
 ```bash
 git switch main
@@ -216,8 +216,8 @@ The following uses the standard Repos API path convention `/Users/<email>/...`. 
 
 ```bash
 databricks repos create \
-  https://github.com/pschehl/databricks-cicd-learning.git gitHub \
-  --path /Users/<email>/databricks-cicd-learning \
+  https://github.com/pschehl/dbx-cicd-learning.git gitHub \
+  --path /Users/<email>/dbx-cicd-learning \
   --profile dbx-git-learning
 ```
 

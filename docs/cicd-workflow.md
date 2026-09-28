@@ -2,7 +2,7 @@
 
 Prepared 2026-09-28. Complete a personal dev run using the [bundle guide](databricks-bundles.md) first. This workflow is prepared in source; no GitHub Actions deployment has yet been verified.
 
-The repository name and OIDC subjects below assume the [GitHub rename described in the README](../README.md) is complete. If federation policies were already created with the old repository name, update their subjects before running CI. A Git URL redirect does not change an OIDC policy's expected subject.
+The federation subjects below use the current repository, `pschehl/dbx-cicd-learning`. They must match the actual GitHub owner and repository name exactly. A Git URL redirect does not update federation policies.
 
 ## What happens for a change
 
@@ -18,7 +18,7 @@ All deployment stages check out the same triggering commit, `${{ github.sha }}`.
 
 ## 1. Configure an automation identity
 
-For this learning exercise, create one Databricks service principal named `databricks-cicd-learning-ci` and assign it to the existing workspace. Grant access to run serverless jobs and create/manage these job resources. Arrange write access to `/Workspace/Shared/.bundle/databricks-cicd-learning` and the principal's dev deployment directory. Record its **application/client ID**, not just its numeric object ID.
+For this learning exercise, create one Databricks service principal named `dbx-cicd-learning-ci` and assign it to the existing workspace. Grant access to run serverless jobs and create/manage these job resources. Arrange write access to `/Workspace/Shared/.bundle/dbx-cicd-learning` and the principal's dev deployment directory. Record its **application/client ID**, not just its numeric object ID.
 
 The workflow uses that identity for deployment and execution. For a production system, consider separate principals and narrower permissions per environment. Here, all three deployments share one workspace and one CI identity; the separation is organizational rather than a strong security boundary.
 
@@ -32,13 +32,13 @@ Create one policy for each environment:
 | --- | --- |
 | Provider | GitHub Actions |
 | GitHub owner | `pschehl` |
-| Repository | `databricks-cicd-learning` |
+| Repository | `dbx-cicd-learning` |
 | Entity type | Environment |
 | Issuer | `https://token.actions.githubusercontent.com` |
 | Audience | Your Databricks account ID |
-| Subject for dev | `repo:pschehl/databricks-cicd-learning:environment:dev` |
-| Subject for staging | `repo:pschehl/databricks-cicd-learning:environment:staging` |
-| Subject for prod | `repo:pschehl/databricks-cicd-learning:environment:prod` |
+| Subject for dev | `repo:pschehl/dbx-cicd-learning:environment:dev` |
+| Subject for staging | `repo:pschehl/dbx-cicd-learning:environment:staging` |
+| Subject for prod | `repo:pschehl/dbx-cicd-learning:environment:prod` |
 
 Use the account ID from the account console; the numeric workspace ID in your browser URL is different. The workflow sets `DATABRICKS_AUTH_TYPE=github-oidc` and requests `id-token: write`. The CLI exchanges GitHub's short-lived token for Databricks access. No Databricks PAT is required. [GitHub OIDC instructions](https://docs.databricks.com/aws/en/dev-tools/auth/provider-github)
 
@@ -49,7 +49,7 @@ Before merging the workflow, open the repository's **Settings → Environments**
 | Variable | Value in this exercise |
 | --- | --- |
 | `DATABRICKS_HOST` | `https://dbc-97622683-114b.cloud.databricks.com` |
-| `DATABRICKS_CLIENT_ID` | Application ID of `databricks-cicd-learning-ci` |
+| `DATABRICKS_CLIENT_ID` | Application ID of `dbx-cicd-learning-ci` |
 
 Restrict deployment branches to `main`. On `prod`, configure a required reviewer if available. The YAML alone does not create an approval requirement. Without that protection, prod proceeds automatically after staging.
 
@@ -59,7 +59,7 @@ Set a branch rule requiring the workflow's test check before merging to `main`. 
 
 ## 4. Review and publish the example
 
-The files prepared here are local changes. Review `git status` and `git diff` before staging them. Use a feature branch for the initial setup, push it, and open a PR into `main`. Include the untracked bundle, code, tests, docs, `.gitignore`, and `.github/workflows` files in the commit.
+Review `git status` and `git diff` before staging changes. Use a feature branch, commit the intended files, push it, and open a PR into `main`. The bundle, sample code, tests, and workflows are already included in this repository.
 
 The PR should run tests only. Configure the environments and federation before merging, because a push to `main` starts deployment automatically. Once merged, open **Actions → CI and environment promotion**.
 
@@ -70,6 +70,8 @@ Observe each stage and approve prod if protection is enabled. In each Databricks
 | dev | 10 | 8 | 2000 |
 | staging | 100 | 80 | 20000 |
 | prod | 1000 | 800 | 200000 |
+
+These are the baseline values in the repository. If you completed the follow-along lab’s permanent dev change, expect 20 input orders, 16 paid orders, and 4000 cents for dev. Staging and prod remain as shown.
 
 All three logs must show the same `release_sha`, matching the GitHub workflow revision. The Actions job summary records target, revision, and workspace after a successful run. Save the run URLs in the verification record.
 

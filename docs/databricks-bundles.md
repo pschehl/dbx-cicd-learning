@@ -29,7 +29,7 @@ All three targets use the existing AWS workspace. They get distinct job names an
 
 `staging` uses production mode so it exercises deployment behavior similar to prod. Target names are project choices; deployment modes control bundle behavior. Development mode adds a user-specific name prefix. [Deployment modes](https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes)
 
-Dev deployment state is under `/Workspace/Users/<deployer>/.bundle/databricks-cicd-learning/dev`. Shared state is under `/Workspace/Shared/.bundle/databricks-cicd-learning/staging` and `/Workspace/Shared/.bundle/databricks-cicd-learning/prod`.
+Dev deployment state is under `/Workspace/Users/<deployer>/.bundle/dbx-cicd-learning/dev`. Shared state is under `/Workspace/Shared/.bundle/dbx-cicd-learning/staging` and `/Workspace/Shared/.bundle/dbx-cicd-learning/prod`.
 
 Your personal dev deployment and the CI service principal's dev deployment are intentionally different copies. Staging and prod have stable paths. Keep the bundle name and root paths stable after deployment: changing them can create a separate deployment rather than update the existing one.
 
@@ -48,7 +48,7 @@ databricks auth login --host https://dbc-97622683-114b.cloud.databricks.com
 
 Name the profile `dbx-git-learning` when prompted. The browser login authorizes your CLI to access Databricks. It is separate from the GitHub connection already completed. [Install the CLI](https://docs.databricks.com/aws/en/dev-tools/cli/install), [CLI authentication](https://docs.databricks.com/aws/en/dev-tools/cli/authentication)
 
-During preparation, CLI 1.18.0 was downloaded only to `/tmp/dbx-cli-1.18.0/databricks` for validation. That temporary copy is not a permanent installation and may disappear after cleanup/reboot.
+The profile name `dbx-git-learning` is a local authentication alias used throughout these guides; it does not need to match the project name.
 
 The job assumes serverless jobs compute and serverless environment version 4 are available to the executing identity. Confirm this in your workspace before running. A Python script task uses `environment_key` to select its job environment; this example has no third-party libraries. [Serverless job example](https://docs.databricks.com/aws/en/dev-tools/bundles/examples)
 
@@ -108,9 +108,11 @@ Expected total: 4000 cents from 16 paid orders. The deployed defaults remain unc
 
 Every synthetic order has a value of 250 cents; every fifth order is cancelled. The transformation sums paid orders and rejects duplicate IDs, invalid amounts, and unknown statuses. Runtime checks verify the deterministic fixture and minimum accepted total. Integer cents avoid floating-point money arithmetic.
 
-Dev therefore produces 8 paid orders and 2000 cents; staging produces 80 and 20000; prod produces 800 and 200000. A threshold one cent above the expected total fails the run. The tests also exercise empty input and a batch size not divisible by five.
+With the baseline configuration, dev produces 8 paid orders and 2000 cents; staging produces 80 and 20000; prod produces 800 and 200000. A threshold one cent above the expected total fails the run. The tests also exercise empty input and a batch size not divisible by five.
 
 This is an end-to-end deployment exercise with a small in-memory transformation. Add Spark processing and environment-specific Unity Catalog schemas as a later extension when you want to test durable data isolation and data migrations.
+
+The [follow-along lab](follow-along-lab.md#5-make-a-permanent-change-through-git) later changes dev to 20 orders and a 4000-cent threshold. After that edit, dev produces 16 paid orders and 4000 cents; staging and prod are unchanged.
 
 ## Staging and prod prerequisites
 
