@@ -1,0 +1,55 @@
+name: CI and environment promotion
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Serialize the whole promotion chain so two revisions cannot interleave.
+concurrency:
+  group: dbx-learning-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'release' }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Unit and command-line tests
+        run: python -m unittest discover -s tests -v
+
+  dev:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: dev
+
+  staging:
+    needs: dev
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: staging
+
+  prod:
+    needs: staging
+    permissions:
+      contents: read
+      id-token: write
+    uses: ./.github/workflows/deploy.yml
+    with:
+      target: prod

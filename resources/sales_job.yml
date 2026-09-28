@@ -1,0 +1,36 @@
+resources:
+  jobs:
+    sales_demo:
+      name: ${bundle.name}-${bundle.target}-sales
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      tags:
+        project: ${bundle.name}
+        environment: ${bundle.target}
+      parameters:
+        - name: environment
+          default: ${bundle.target}
+        - name: batch_size
+          default: ${var.batch_size}
+        - name: min_total_cents
+          default: ${var.min_total_cents}
+        - name: release_sha
+          default: ${var.release_sha}
+      tasks:
+        - task_key: transform_and_verify
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/sales_job.py
+            parameters:
+              - --environment
+              - "{{job.parameters.environment}}"
+              - --batch-size
+              - "{{job.parameters.batch_size}}"
+              - --min-total-cents
+              - "{{job.parameters.min_total_cents}}"
+              - --release-sha
+              - "{{job.parameters.release_sha}}"
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "4"

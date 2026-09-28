@@ -1,0 +1,48 @@
+name: Deploy and verify a bundle target
+
+on:
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ inputs.target }}
+    env:
+      TARGET: ${{ inputs.target }}
+      DATABRICKS_AUTH_TYPE: github-oidc
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_CLIENT_ID: ${{ vars.DATABRICKS_CLIENT_ID }}
+      BUNDLE_VAR_deploy_sp: ${{ vars.DATABRICKS_CLIENT_ID }}
+      BUNDLE_VAR_release_sha: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Check environment configuration
+        shell: bash
+        run: |
+          test -n "$DATABRICKS_HOST" || { echo 'Set DATABRICKS_HOST in the GitHub environment'; exit 1; }
+          test -n "$DATABRICKS_CLIENT_ID" || { echo 'Set DATABRICKS_CLIENT_ID in the GitHub environment'; exit 1; }
+          case "$TARGET" in dev|staging|prod) ;; *) exit 1 ;; esac
+      - uses: databricks/setup-cli@main
+        with:
+          version: "1.18.0"
+      - name: Validate resolved bundle
+        run: databricks bundle validate -t "$TARGET"
+      - name: Deploy this revision
+        run: databricks bundle deploy -t "$TARGET" --auto-approve
+      - name: Run and wait for quality checks
+        run: databricks bundle run -t "$TARGET" sales_demo
+      - name: Record release
+        shell: bash
+        run: |
+          printf 'Target: %s\n\nRevision: %s\n\nWorkspace: %s\n' "$TARGET" "$BUNDLE_VAR_release_sha" "$DATABRICKS_HOST" >> "$GITHUB_STEP_SUMMARY"

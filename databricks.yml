@@ -1,0 +1,67 @@
+bundle:
+  name: databricks-cicd-learning
+  databricks_cli_version: ">= 1.18.0"
+
+include:
+  - resources/*.yml
+
+variables:
+  batch_size:
+    description: Number of synthetic orders to process (1 to 100000).
+    default: "10"
+  min_total_cents:
+    description: Minimum accepted total; raising this can demonstrate a failed promotion.
+    default: "2000"
+  release_sha:
+    description: Git commit deployed by CI, or local for an interactive deployment.
+    default: local
+  deploy_sp:
+    description: Service principal application ID; required for staging and prod.
+    default: ""
+
+workspace:
+  host: https://dbc-97622683-114b.cloud.databricks.com
+
+sync:
+  include:
+    - src/**
+  exclude:
+    - docs/**
+    - tests/**
+    - .github/**
+
+targets:
+  dev:
+    default: true
+    mode: development
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      batch_size: "10"
+      min_total_cents: "2000"
+
+  staging:
+    mode: production
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.deploy_sp}
+    permissions:
+      - service_principal_name: ${var.deploy_sp}
+        level: CAN_MANAGE
+    variables:
+      batch_size: "100"
+      min_total_cents: "20000"
+
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.deploy_sp}
+    permissions:
+      - service_principal_name: ${var.deploy_sp}
+        level: CAN_MANAGE
+    variables:
+      batch_size: "1000"
+      min_total_cents: "200000"
