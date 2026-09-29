@@ -126,14 +126,13 @@ Open a PR into `main` on GitHub. Under **Checks**, inspect the Python tests. In 
 
 ## 6. Enable automatic promotion
 
-Follow [CI/CD setup, sections 1–3](cicd-workflow.md#1-configure-an-automation-identity) to configure:
+Follow [CI/CD setup, sections 1–3](cicd-workflow.md#1-personal-account-setup-for-this-learning-exercise) to configure:
 
-1. A Databricks service principal assigned to the workspace with the required job and workspace permissions.
-2. GitHub OIDC federation policies for `repo:pschehl/dbx-cicd-learning:environment:dev`, `staging`, and `prod` (each subject ends with its own environment name).
-3. GitHub environments named `dev`, `staging`, and `prod`, each with `DATABRICKS_HOST` and `DATABRICKS_CLIENT_ID` variables.
-4. A required reviewer for prod if your GitHub plan supports it. Without this setting, prod proceeds automatically.
+1. A personal Databricks token, if your workspace permits it.
+2. GitHub environments `dev`, `staging`, and `prod`, each with a `DATABRICKS_HOST` variable and `DATABRICKS_TOKEN` secret.
+3. Optional production approval if supported by your GitHub plan.
 
-This setup may need your Databricks administrator. Your personal dev run does not depend on completing it.
+You need your existing job/serverless permissions and access to manage GitHub environment settings. No service principal or federation setup is needed for this learning route. If personal tokens are disabled, ask your workspace administrator about an approved automation method.
 
 Then merge the PR. In **Actions → CI and environment promotion**, follow tests → dev → staging → prod. Approve prod if configured. Inspect each remote task output:
 
@@ -143,7 +142,7 @@ Then merge the PR. In **Actions → CI and environment promotion**, follow tests
 | staging | 100 | 80 | 20000 |
 | prod | 1000 | 800 | 200000 |
 
-Each output should show the same `release_sha`, matching the triggering commit. CI creates its own dev deployment under the service principal's identity; your personal dev job remains separate.
+Each output should show the same `release_sha`, matching the triggering commit. CI uses your personal identity and updates the same dev deployment as your laptop. Avoid deploying manually while CI is running.
 
 To demonstrate a failed promotion and recovery, follow [the staging failure exercise](cicd-workflow.md#5-prove-a-failure-stops-promotion). Raising staging's threshold to 20001 should fail staging and skip prod. Restore it to 20000 through a follow-up PR. With this lab's dev change, dev still produces 4000 cents.
 
@@ -167,4 +166,4 @@ To remove only your personal dev deployment when done:
 databricks bundle destroy -t dev -p dbx-git-learning
 ```
 
-Review the CLI confirmation before accepting. This leaves the Git repository and CI's deployments in place. Use the existing [bundle reference](databricks-bundles.md) for configuration details and [CI/CD reference](cicd-workflow.md) for authentication and promotion troubleshooting.
+Review the CLI confirmation before accepting. This leaves the Git repository and staging/prod deployments in place, but removes the dev deployment also used by CI. Use the existing [bundle reference](databricks-bundles.md) for configuration details and [CI/CD reference](cicd-workflow.md) for authentication and promotion troubleshooting.

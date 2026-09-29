@@ -151,15 +151,13 @@ All three targets use the existing AWS workspace. They get distinct job names an
 
 | Target | Bundle mode | Orders | Minimum total (cents) | Identity |
 | --- | --- | ---: | ---: | --- |
-| `dev` | development | 10 | 2000 | Current deployer: you locally, service principal in CI |
-| `staging` | production | 100 | 20000 | Configured service principal |
-| `prod` | production | 1000 | 200000 | Configured service principal |
+| `dev` | development | 10 | 2000 | Your personal account locally and in CI |
+| `staging` | omitted (learning) | 100 | 20000 | Your personal account |
+| `prod` | omitted (learning) | 1000 | 200000 | Your personal account |
 
-`staging` uses production mode so it exercises deployment behavior similar to prod. Target names are project choices; deployment modes control bundle behavior. Development mode adds a user-specific name prefix. [Deployment modes](https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes)
+Staging and prod omit deployment mode for personal-account learning; their names still select separate deployments. Development mode adds a user-specific prefix to dev resources. See [deployment modes](https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes).
 
-Dev deployment state is under `/Workspace/Users/<deployer>/.bundle/dbx-cicd-learning/dev`. Shared state is under `/Workspace/Shared/.bundle/dbx-cicd-learning/staging` and `/Workspace/Shared/.bundle/dbx-cicd-learning/prod`.
-
-Your personal dev deployment and the CI service principal's dev deployment are intentionally different copies. Staging and prod have stable paths. Keep the bundle name and root paths stable after deployment: changing them can create a separate deployment rather than update the existing one.
+All state paths are under `/Workspace/Users/<deployer>/.bundle/dbx-cicd-learning/<target>`. Your laptop and CI update the same dev deployment when authenticated as the same user. Avoid concurrent local and CI deployments. Keep the bundle name and root paths stable after deployment; changing them creates separate state rather than migrating resources.
 
 These targets provide deployment separation within one workspace. They do not provide separate network or account boundaries. No schemas or tables are created by this exercise.
 
@@ -215,7 +213,7 @@ There are three distinct configuration layers:
 
 | Layer | Example | When used |
 | --- | --- | --- |
-| GitHub environment variable | `DATABRICKS_CLIENT_ID` | Authenticate the CI runner |
+| GitHub environment secret | `DATABRICKS_TOKEN` | Authenticate the CI runner as your personal user |
 | Bundle variable | `${var.batch_size}` | Supply a job parameter default during deployment |
 | Job parameter | `{{job.parameters.batch_size}}` | Supply the actual value to a task run |
 
@@ -244,9 +242,7 @@ The [follow-along lab](follow-along-lab.md#5-make-a-permanent-change-through-git
 
 ## Staging and prod prerequisites
 
-Use [stage 3](cicd-workflow.md) to configure a CI service principal, workspace access, federation, and GitHub environments. CI supplies `BUNDLE_VAR_deploy_sp` with that principal's application ID and uses it as the staging/prod run identity.
-
-The deployer needs access to create/update the bundle resources and write the shared deployment directories. The run identity needs permission to execute serverless jobs. Using a different deployer and run identity additionally requires permission to use that service principal. This starter keeps them the same in CI.
+Use [stage 3](cicd-workflow.md) to create a personal Databricks token and configure GitHub environments for learning. Your user needs job creation, personal folder write access, and serverless execution permissions. The guide also describes migrating to a service principal with OIDC for production.
 
 For a future move to separate workspaces, set a literal `workspace.host` under each target and update its corresponding GitHub `DATABRICKS_HOST`. Recreate the required identity access there. Authentication host fields do not support `${var...}` interpolation in CLI 1.18.0.
 
@@ -258,7 +254,7 @@ To remove your personal example deployment, review the resources and run:
 databricks bundle destroy -t dev -p dbx-git-learning
 ```
 
-Read the CLI confirmation carefully. Use the same identity and target that created it. Destroying your personal dev copy does not remove CI's dev copy. Do not manually delete bundle state as a cleanup shortcut.
+Read the CLI confirmation carefully. Use the same identity and target that created it. Because CI uses your account, this also removes the dev deployment used by CI; a future CI deployment recreates it. Do not manually delete bundle state as a cleanup shortcut.
 
 If a deployment fails, correct the configuration and redeploy with the same bundle name, identity, and path. If a run fails after a successful deploy, the deployed job remains; failure does not automatically roll back the deployment.
 

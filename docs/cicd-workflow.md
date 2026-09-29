@@ -1,8 +1,8 @@
 # Stage 3: end-to-end CI/CD
 
-Prepared 2026-09-28. Complete a personal dev run using the [bundle guide](databricks-bundles.md) first. This workflow is prepared in source; no GitHub Actions deployment has yet been verified.
+Updated 2026-09-29. Complete a personal dev run using the [bundle guide](databricks-bundles.md) first. This workflow is prepared in source; no GitHub Actions deployment has yet been verified.
 
-The federation subjects below use the current repository, `pschehl/dbx-cicd-learning`. They must match the actual GitHub owner and repository name exactly. A Git URL redirect does not update federation policies.
+The active configuration uses your personal account for learning in `pschehl/dbx-cicd-learning`. A production migration is described below.
 
 ## What happens for a change
 
@@ -16,52 +16,85 @@ All deployment stages check out the same triggering commit, `${{ github.sha }}`.
 
 `ci-cd.yml` defines the ordering. `deploy.yml` supplies the shared implementation. `bundle run` waits for completion; removing that wait would allow promotion before the job result was known. [Databricks GitHub Actions guidance](https://docs.databricks.com/aws/en/dev-tools/ci-cd/github)
 
-## 1. Configure an automation identity
+## 1. Personal account setup for this learning exercise
 
-For this learning exercise, create one Databricks service principal named `dbx-cicd-learning-ci` and assign it to the existing workspace. Grant access to run serverless jobs and create/manage these job resources. Arrange write access to `/Workspace/Shared/.bundle/dbx-cicd-learning` and the principal's dev deployment directory. Record its **application/client ID**, not just its numeric object ID.
+You do not need Databricks admin rights if your user can create/use personal access tokens, create jobs, write to your own workspace folder, and run serverless jobs. Tokens cannot grant permissions your account does not already have. If token creation is disabled, an administrator must enable it or arrange another supported automation identity.
 
-The workflow uses that identity for deployment and execution. For a production system, consider separate principals and narrower permissions per environment. Here, all three deployments share one workspace and one CI identity; the separation is organizational rather than a strong security boundary.
+In your Databricks workspace, open **Settings → Developer → Access tokens → Manage → Generate new token**. Name it `github-dbx-cicd-learning` and choose a short lifetime suitable for the exercise. If the UI offers API scopes, choose scopes that support bundle deployment and execution (workspace files, jobs, and identity lookup), not a SQL-only token; follow the linked scope documentation for your workspace. Copy it directly into GitHub as described below. This is a **Databricks token**, not the GitHub PAT used for Git pushes. Never commit it or paste it in chat. [Token creation and workspace restrictions](https://docs.databricks.com/aws/en/dev-tools/auth/pat)
 
-## 2. Trust GitHub Actions using OIDC
+Your laptop can continue using browser-based OAuth with `dbx-git-learning`. GitHub's runner uses the token independently and has no access to your laptop profile. The workflow sets `DATABRICKS_AUTH_TYPE=pat` and reads `DATABRICKS_TOKEN` from an environment secret. No client ID, client secret, federation policy, or `id-token: write` permission is needed for this learning setup.
 
-An account admin can open the [Databricks account console](https://accounts.cloud.databricks.com), select **User management → Service principals → your principal → Credentials & secrets → Federation policies**, and create policies. This establishes which external identity may authenticate as the principal. [Federation policy setup](https://docs.databricks.com/aws/en/dev-tools/auth/oauth-federation-policy)
+## 2. Configure GitHub environments
 
-Create one policy for each environment:
+Open **repository Settings → Environments**. Create `dev`, `staging`, and `prod`. For **each** environment, add:
 
-| Field | Value |
+| Kind | Name | Value |
+| --- | --- | --- |
+| Environment variable | `DATABRICKS_HOST` | `https://dbc-97622683-114b.cloud.databricks.com` |
+| Environment secret | `DATABRICKS_TOKEN` | Your Databricks personal access token |
+
+For this exercise, the same workspace and personal token can be used in all three environments. The YAML reads `${{ vars.DATABRICKS_HOST }}` and `${{ secrets.DATABRICKS_TOKEN }}`; putting the token in Variables will not work. The reusable workflow selects its environment itself, so its job obtains the corresponding environment secret without a caller-level `secrets: inherit` setting.
+
+Restrict deployment branches to `main`. Optionally configure a required reviewer for `prod`, if available for your repository and plan. Without this protection, prod proceeds automatically. For a solo exercise, preventing self-review requires another eligible reviewer; otherwise you cannot approve your own run. [GitHub environments](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
+
+You need permission to manage these GitHub settings, even though Databricks admin rights are not required. No additional Databricks Git credential is needed by Actions: checkout retrieves the repository and the CLI uploads the code.
+
+## 3. Understand the learning deployments
+
+All targets deploy under your personal workspace directory:
+
+```text
+/Workspace/Users/<your-user-name>/.bundle/dbx-cicd-learning/dev
+/Workspace/Users/<your-user-name>/.bundle/dbx-cicd-learning/staging
+/Workspace/Users/<your-user-name>/.bundle/dbx-cicd-learning/prod
+```
+
+Dev uses development mode. Staging and prod omit `mode`; they are target names for practicing promotion, not real production environments. Production mode has additional identity/path checks intended for production deployments. Staging and prod explicitly run as the authenticated user and give that user `CAN_MANAGE`. [Deployment modes](https://docs.databricks.com/aws/en/dev-tools/bundles/deployment-modes)
+
+Because CI and your laptop use the same user, bundle name, and dev root, **CI updates your existing personal dev deployment**. Avoid deploying locally while CI is running. Staging and prod have distinct paths and jobs. If you previously deployed using the older shared paths, this change creates new deployments; it does not migrate or delete the old resources.
+
+## What each workflow does, and when
+
+A GitHub Actions **workflow** is a YAML-defined automation. It contains **jobs**, which contain **steps**. The term CI/CD pipeline describes the overall sequence. A Databricks **job** is a separate workspace resource; in this repository it contains the Python task `transform_and_verify`.
+
+### `ci-cd.yml`: trigger, tests, and promotion order
+
+| Trigger | Behavior |
 | --- | --- |
-| Provider | GitHub Actions |
-| GitHub owner | `pschehl` |
-| Repository | `dbx-cicd-learning` |
-| Entity type | Environment |
-| Issuer | `https://token.actions.githubusercontent.com` |
-| Audience | Your Databricks account ID |
-| Subject for dev | `repo:pschehl/dbx-cicd-learning:environment:dev` |
-| Subject for staging | `repo:pschehl/dbx-cicd-learning:environment:staging` |
-| Subject for prod | `repo:pschehl/dbx-cicd-learning:environment:prod` |
+| Open/update a PR targeting `main` | Run tests only; deployment jobs are skipped. |
+| Push to `main`, including a merged PR or docs-only commit | Run tests, then dev, staging, and prod in order. |
+| Actions → CI and environment promotion → Run workflow on `main` | Run the full chain without requiring a new commit. |
+| Manual dispatch on another branch | Run tests only. |
 
-Use the account ID from the account console; the numeric workspace ID in your browser URL is different. The workflow sets `DATABRICKS_AUTH_TYPE=github-oidc` and requests `id-token: write`. The CLI exchanges GitHub's short-lived token for Databricks access. No Databricks PAT is required. [GitHub OIDC instructions](https://docs.databricks.com/aws/en/dev-tools/auth/provider-github)
+The `test` job starts an Ubuntu runner, checks out the code, installs Python 3.11, and runs `python -m unittest discover -s tests -v`. Tests do not require Databricks credentials or remote compute. In a PR, checkout normally tests GitHub's proposed merge result.
 
-## 3. Configure GitHub environments
+`dev` has `needs: test` and a condition limiting deployment to main outside PR events. `staging` needs successful dev; `prod` needs successful staging. Each calls `deploy.yml` with a different `target`. A failure skips dependent jobs. A configured environment approval waits before the deployment job starts.
 
-Before merging the workflow, open the repository's **Settings → Environments** and create `dev`, `staging`, and `prod`. In each, add these environment variables:
+The workflow's concurrency group serializes release runs; `cancel-in-progress: false` means an active release is not interrupted by a newer push. GitHub can replace pending runs with a newer pending run, so this is not a guarantee every pushed revision deploys. Separate PRs have separate concurrency groups. This coordination does not cover CLI deployments from your laptop.
 
-| Variable | Value in this exercise |
+### `deploy.yml`: reusable deployment implementation
+
+This workflow uses `workflow_call`, so it is invoked by the main workflow rather than independently triggered by a push. Its `deploy` job selects `environment: ${{ inputs.target }}`, loads that environment's host and token, and has a 30-minute timeout.
+
+| Step | Exactly what happens |
 | --- | --- |
-| `DATABRICKS_HOST` | `https://dbc-97622683-114b.cloud.databricks.com` |
-| `DATABRICKS_CLIENT_ID` | Application ID of `dbx-cicd-learning-ci` |
+| Checkout | Retrieves `${{ github.sha }}` so all release stages deploy the same triggering commit. |
+| Check environment configuration | Checks that host and token are nonempty and target is dev/staging/prod. It does not verify token validity. |
+| Install CLI | Installs Databricks CLI 1.18.0 on the runner. |
+| Validate resolved bundle | Authenticates and resolves the selected target, variables, resources, and user paths. |
+| Deploy this revision | Uploads source files and creates/updates resources for that target. `--auto-approve` handles CLI prompts, not GitHub environment approvals. |
+| Run and wait for quality checks | Executes `sales_demo` and waits for the remote task. A failed job causes this step and promotion to fail. |
+| Record release | On success, writes the target, commit SHA, and workspace into the Actions summary. |
 
-Restrict deployment branches to `main`. On `prod`, configure a required reviewer if available. The YAML alone does not create an approval requirement. Without that protection, prod proceeds automatically after staging.
+`BUNDLE_VAR_release_sha` supplies the triggering Git SHA as a deployment-time variable. The job prints it at runtime. Batch sizes and quality thresholds come from `databricks.yml`. Tests run on GitHub; the sales job runs on Databricks serverless compute and incurs workspace usage. Pulling your workspace Git folder is not part of this process.
 
-Availability of environments and required reviewers depends on repository visibility and your GitHub plan. If approvals are unavailable, this exercise can demonstrate automatic promotion, but should not be described as approval-gated. Review the current [GitHub environment settings](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments).
-
-Set a branch rule requiring the workflow's test check before merging to `main`. GitHub branch rules and environment protections are configuration outside this repository; review them along with changes to workflow files.
+A successful deploy followed by a failed run leaves the new job configuration deployed. There is no automatic rollback. The workflow contains no schedule; each main push/manual main dispatch invokes the chain once.
 
 ## 4. Review and publish the example
 
 Review `git status` and `git diff` before staging changes. Use a feature branch, commit the intended files, push it, and open a PR into `main`. The bundle, sample code, tests, and workflows are already included in this repository.
 
-The PR should run tests only. Configure the environments and federation before merging, because a push to `main` starts deployment automatically. Once merged, open **Actions → CI and environment promotion**.
+The PR should run tests only. Configure the environment variables and token secrets before merging, because a push to `main` starts deployment automatically. Once merged, open **Actions → CI and environment promotion**.
 
 Observe each stage and approve prod if protection is enabled. In each Databricks job's task output, verify:
 
@@ -97,7 +130,7 @@ databricks bundle run -t dev -p dbx-git-learning sales_demo \
   --params batch_size=20,min_total_cents=4000
 ```
 
-In CI, `BUNDLE_VAR_release_sha` and `BUNDLE_VAR_deploy_sp` come from the triggering revision and environment identity. Batch sizes and thresholds stay versioned in `databricks.yml` so a PR makes their changes visible.
+In CI, `BUNDLE_VAR_release_sha` comes from the triggering revision. The token identifies the deploying user. Batch sizes and thresholds stay versioned in `databricks.yml` so a PR makes their changes visible.
 
 ## 7. Recovery and rollback
 
@@ -112,12 +145,12 @@ If you cancel Actions while Databricks is running, inspect the Databricks run se
 | Failure | What to inspect |
 | --- | --- |
 | Missing environment variables | Variables belong under each GitHub environment, not only a local shell. |
-| OIDC authentication rejected | Exact federation subject, audience, client ID, workspace assignment, and `id-token` permission. |
+| Token authentication rejected | Token expiration/revocation, workspace host, token scopes, and environment secret placement. |
 | Workspace write denied | Deployment principal permissions on the root directory and existing job. |
-| Run identity rejected | `deploy_sp` must be the application ID and the deployer must be allowed to use the identity. |
+| Run identity rejected | The token must belong to the user resolved by the CLI and that user must have job execution access. |
 | Serverless task rejected | Workspace availability, principal entitlement, and supported environment version. |
 | Prod starts without approval | Required reviewers were not configured or are unavailable for the plan/repository. |
-| Personal job not updated by CI | Dev paths include the deploying identity; inspect CI's job, not your personal copy. |
+| Unexpected personal job changes | CI and local dev share deployment state when using the same personal account. |
 | Job succeeds but wrong revision | Compare `release_sha` and task source; check for out-of-band manual deployments. |
 | Deployment lock held | Inspect other active deployments before retrying; do not force past a live lock. |
 
@@ -126,15 +159,33 @@ If you cancel Actions while Databricks is running, inspect the Databricks run se
 | Item | Status / value |
 | --- | --- |
 | Workspace layout | Single AWS workspace; three deployments |
-| CI identity and application ID | Pending setup |
+| Personal token stored in GitHub environment secrets | Pending setup |
 | GitHub environments and branch restrictions | Pending setup |
-| Federation policies | Pending setup |
+| Personal job/serverless permissions | Pending verification |
 | Production required reviewer | Pending setup / check plan availability |
 | Successful workflow run URL and SHA | Pending |
 | Failed-staging / skipped-prod run URL | Pending |
 | Recovery run URL | Pending |
 | Last end-to-end verification date | Pending |
 
-When returning later, check CLI version compatibility, identity membership, federation subjects, GitHub protection rules, serverless availability, and deployment paths. Rerun tests and dev before changing shared targets. CI currently pins CLI 1.18.0; update deliberately and rerun the exercise. The CLI installer action follows `main`; pin it to a reviewed commit when hardening this starter for long-term production use.
+When returning later, check CLI version compatibility, token expiration, user permissions, GitHub protection rules, serverless availability, and deployment paths. Rerun tests and dev before changing shared targets. CI currently pins CLI 1.18.0; update deliberately and rerun the exercise. The CLI installer action follows `main`; pin it to a reviewed commit when hardening this starter for long-term production use.
 
 Next extensions: separate environment principals, Unity Catalog schemas and table-level permissions, Spark integration tests, dependency packaging, and genuinely separate workspaces if isolation requirements justify them.
+
+## Production: migrate to a service principal and OIDC
+
+For production workloads, use a dedicated service principal with workload identity federation (OIDC), ideally with permissions scoped per environment. This removes the dependency on your personal account and avoids storing a personal token in GitHub. Databricks recommends service principal run identities for production. [Run identity guidance](https://docs.databricks.com/aws/en/dev-tools/bundles/run-as)
+
+This is a coordinated configuration change, not just replacing the token:
+
+1. Have an account administrator create/assign the service principal and grant workspace, deployment-folder, and compute permissions.
+2. Create federation policies with issuer `https://token.actions.githubusercontent.com`, audience your Databricks account ID, subject claim `sub`, and these subjects:
+   - `repo:pschehl/dbx-cicd-learning:environment:dev`
+   - `repo:pschehl/dbx-cicd-learning:environment:staging`
+   - `repo:pschehl/dbx-cicd-learning:environment:prod`
+3. Add its application ID as `DATABRICKS_CLIENT_ID` in each GitHub environment. Change the reusable workflow to `DATABRICKS_AUTH_TYPE: github-oidc`, read that client ID, and remove `DATABRICKS_TOKEN`. Update the configuration check accordingly.
+4. Grant `id-token: write` to each calling deployment job and the reusable workflow; retain `contents: read`.
+5. Configure bundle `run_as.service_principal_name` and permissions for the principal, controlled team deployment directories, and production mode for staging/prod. Plan deployment-state migration before changing existing paths or identities.
+6. Verify dev, staging, and production approvals, then remove/revoke the learning token when no longer needed.
+
+[Official GitHub OIDC setup](https://docs.databricks.com/aws/en/dev-tools/auth/provider-github)
